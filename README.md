@@ -13,7 +13,7 @@ This repository provides a dataset of experimental procedure videos with ground 
 
 **Video dataset and ground truth procedures are available via DOI:**
 
-`https://doi.org/[TO_BE_ANNOUNCED]`
+`https://doi.org/10.5281/zenodo.17811722`
 
 ### Dataset Contents
 
@@ -129,7 +129,7 @@ python example/procedure_evaluation_pipeline.py --batch test           # 50 take
 
 Complete execution logs and generated results for the **test split** (50 takes, 10 iterations) are available at:
 
-`https://doi.org/[TO_BE_ANNOUNCED]`
+`https://doi.org/10.5281/zenodo.17811722`
 
 The logs include:
 - Complete console output from `--batch test --iterations 10` execution
@@ -184,12 +184,12 @@ output/
 If you use this dataset or code in your research, please cite:
 
 ```bibtex
-@article{[CITATION_KEY],
-  author    = {[Author names]},
-  title     = {[Paper title]},
-  journal   = {[Journal/Conference name]},
-  year      = {[Year]},
-  note      = {Pending publication}
+@misc{CREOLab2025,
+  title        = {CREOLab: CREative tool use in Object-rich Laboratory},
+  author       = {Goto, Shigeaki and Hasebe, Tatsuki},
+  year         = {2025},
+  doi          = {10.5281/zenodo.17811722},
+  url          = {https://doi.org/10.5281/zenodo.17811722}
 }
 ```
 
