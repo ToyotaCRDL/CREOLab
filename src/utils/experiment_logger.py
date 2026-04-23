@@ -9,6 +9,8 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 from pathlib import Path
 
+from .config_loader import config_loader
+
 
 class ExperimentLogger:
     """
@@ -46,10 +48,12 @@ class ExperimentLogger:
         if not self.timestamp:
             self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
+        provider = config_loader.get_provider()
+        
         if self.batch_mode:
-            # Batch mode: batch_TIMESTAMP/SPLIT/TAKE/
+            # Batch mode: provider/batch_TIMESTAMP/SPLIT/TAKE/
             prefix = "batch"
-            self.experiment_dir = os.path.join(self.base_output_dir, f"{prefix}_{self.timestamp}")
+            self.experiment_dir = os.path.join(self.base_output_dir, provider, f"{prefix}_{self.timestamp}")
             if self.split_name:
                 self.experiment_dir = os.path.join(self.experiment_dir, self.split_name)
             if take_name:
@@ -57,9 +61,9 @@ class ExperimentLogger:
                 Path(self.take_dir).mkdir(parents=True, exist_ok=True)
                 return self.take_dir
         else:
-            # Single mode: single_TIMESTAMP/TAKE/
+            # Single mode: provider/single_TIMESTAMP/TAKE/
             prefix = "single"
-            self.experiment_dir = os.path.join(self.base_output_dir, f"{prefix}_{self.timestamp}")
+            self.experiment_dir = os.path.join(self.base_output_dir, provider, f"{prefix}_{self.timestamp}")
             if take_name:
                 self.take_dir = os.path.join(self.experiment_dir, take_name)
                 Path(self.take_dir).mkdir(parents=True, exist_ok=True)
@@ -142,8 +146,13 @@ class ExperimentLogger:
             "processing_settings": {
                 "clip_duration": 6.0,
                 "stride": 5.0,
-                "frames_per_clip": 7,
+                "frames_per_clip": config_loader.get_max_images() or 7,
                 "reference_image_enabled": True
+            },
+            "llm_config": {
+                "provider": config_loader.get_provider(),
+                "model": config_loader.get_model(),
+                "max_tokens": config_loader.get_llm_settings().get("max_tokens"),
             },
             "system_info": {
                 "python_version": None,  # Can be filled if needed
@@ -247,6 +256,7 @@ class ExperimentLogger:
         
         exp_info = self.experiment_config.get("experiment_info", {})
         input_params = self.experiment_config.get("input_parameters", {})
+        llm_cfg = self.experiment_config.get("llm_config", {})
         results = self.experiment_config.get("processing_results", {})
         
         summary = f"""
@@ -254,6 +264,10 @@ class ExperimentLogger:
 Experiment ID: {exp_info.get('experiment_id', 'N/A')}
 Execution Time: {exp_info.get('created_at', 'N/A')}
 Output Directory: {self.experiment_dir}
+
+=== LLM Configuration ===
+Provider: {llm_cfg.get('provider', 'N/A')}
+Model: {llm_cfg.get('model', 'N/A')}
 
 === Input Parameters ===
 Video File: {input_params.get('video_filename', 'N/A')}

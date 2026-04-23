@@ -9,7 +9,7 @@ import re
 import json
 from datetime import datetime
 
-from src.core.openai_client import OpenAIVisionClient
+from src.core import create_llm_client
 from src.core.base_models import ExtractedFrame, ProcedureStep, SegmentProcedure, CaptionData, ObjectInfo, create_step_id
 from src.utils.prompt_loader import PromptLoader, prompt_loader
 
@@ -25,11 +25,11 @@ class SegmentCaptioner:
         """Initialize the unified captioner.
         
         Args:
-            model: OpenAI model to use (defaults to config setting)
+            model: LLM model to use (defaults to config setting)
             is_manual_mode: True for manual object detection mode, False for auto detection mode
             base_prompts_dir: Base directory for saving prompts (defaults to "prompts")
         """
-        self.client = OpenAIVisionClient(model=model)
+        self.client = create_llm_client(model=model)
         self.is_manual_mode = is_manual_mode
         self.prompt_loader = PromptLoader()
         self.segment_prompt_template = prompt_loader.get_prompt("common_captioning_prompts.json", "segment_analysis")
@@ -78,8 +78,8 @@ class SegmentCaptioner:
             segment_id: Segment identifier
             processing_mode: Processing mode (auto_detection or manual_detection)
             image_paths: List of image file paths sent with the prompt
-            prompt: The prompt text sent to GPT
-            response: The response received from GPT
+            prompt: The prompt text sent to the LLM
+            response: The response received from the LLM
         """
         import os
         import shutil
@@ -148,8 +148,8 @@ class SegmentCaptioner:
             f.write(f"Prompt Length: {len(prompt)} characters\n")
             f.write(f"Response Length: {len(response)} characters\n")
             f.write("\nFiles:\n")
-            f.write("- prompt.txt: The prompt sent to GPT\n")
-            f.write("- response.txt: The response received from GPT\n")
+            f.write("- prompt.txt: The prompt sent to the LLM\n")
+            f.write("- response.txt: The response received from the LLM\n")
             f.write("- images/: Directory containing all images sent with the prompt\n")
             f.write("  - 00_reference_overlay_*: Reference image with object overlays\n")
             f.write("  - 01_segment_frame_*, 02_segment_frame_*, ...: Video segment frames\n")
@@ -179,9 +179,15 @@ class SegmentCaptioner:
             # Auto-detect based on is_manual_mode flag
             processing_mode = "manual_detection" if self.is_manual_mode else "auto_detection"
         
-        # Single unified flow: ObjectInfo list → formatted text → prompt → GPT → steps
+        # Single unified flow: ObjectInfo list → formatted text → prompt → LLM → steps
         objects_info = self._format_objects_info(objects, processing_mode)
-        prompt = self.segment_prompt_template.format(objects_info=objects_info)
+        num_segment_frames = len(frames) - 1  # exclude reference overlay
+        frame_interval = 6.0 / (num_segment_frames - 1) if num_segment_frames > 1 else 1.0
+        prompt = self.segment_prompt_template.format(
+            objects_info=objects_info,
+            frame_interval=f"{frame_interval:.1f}",
+            num_segment_frames=str(num_segment_frames),
+        )
         image_paths = [frame.image_path for frame in frames]
         
         response = self.client.analyze_frames(
@@ -200,7 +206,7 @@ class SegmentCaptioner:
             steps=steps,
             processing_mode=processing_mode,
             used_prompt=prompt,
-            gpt_response=response
+            llm_response=response
         )
 
     def caption_multiple_segments(self, 
@@ -234,7 +240,7 @@ class SegmentCaptioner:
 
     def _parse_response_to_steps(self, response: str, segment_id: str) -> List[ProcedureStep]:
         """
-        Parse GPT response into structured procedure steps.
+        Parse LLM response into structured procedure steps.
         """
         steps = []
         lines = response.strip().split('\n')

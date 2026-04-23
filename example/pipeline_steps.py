@@ -13,9 +13,10 @@ from src.utils.reference_image_generator import ReferenceImageGenerator
 from src.captioning.object_knowledge_loader import ObjectKnowledgeLoader
 from src.captioning.segment_captioner import SegmentCaptioner
 from src.captioning.auto_object_detector import AutoObjectDetector
-from src.core.openai_client import OpenAIVisionClient
+from src.core.base_client import BaseLLMClient
 from src.core.procedure_integrator import ProcedureIntegrator
 from src.evaluation.procedure_evaluator import ProcedureEvaluator
+from src.utils.config_loader import config_loader
 
 from io_utils import save_text, save_integration_result, save_error_log
 
@@ -181,7 +182,15 @@ def segment_and_extract_frames(
     # Step 1: Video Segmentation
     print("Step 1: Segmenting video...")
     segmenter = VideoSegmenter(clip_duration=6.0, stride=5.0)
-    frame_extractor = FrameExtractor()
+    
+    max_images = config_loader.get_max_images()
+    if max_images:
+        num_segment_frames = max_images - 1
+        segment_duration = 6.0
+        timestamps = [segment_duration * i / (num_segment_frames - 1) for i in range(num_segment_frames)]
+        frame_extractor = FrameExtractor(frame_timestamps=timestamps)
+    else:
+        frame_extractor = FrameExtractor()
     
     # Get video info
     video_info = segmenter.get_video_info(video_path)
@@ -223,7 +232,7 @@ def segment_and_extract_frames(
         # Create ExtractedFrame objects
         frames = []
         for j, frame_file in enumerate(frame_files):
-            actual_timestamp = segment_start_time + float(j)
+            actual_timestamp = segment_start_time + frame_extractor.frame_timestamps[j] if j < len(frame_extractor.frame_timestamps) else segment_start_time + float(j)
             frame_id = create_frame_id(segment_id, j, actual_timestamp)
             frames.append(ExtractedFrame(
                 frame_id=frame_id,
@@ -245,7 +254,7 @@ def generate_procedures(
     ref_images_dir: str,
     reference_image_with_overlay: Optional[str],
     prompts_dir: str,
-    openai_client: OpenAIVisionClient,
+    openai_client: BaseLLMClient,
     knowledge_loader: ObjectKnowledgeLoader
 ) -> Tuple[Any, Any, Optional[str]]:
     """
@@ -342,7 +351,7 @@ def integrate_procedures(
     experiment_dir: str,
     integration_dir: str,
     prompts_dir: str,
-    openai_client: OpenAIVisionClient,
+    openai_client: BaseLLMClient,
     integration_types: List[str]
 ) -> Dict[str, str]:
     """
@@ -409,7 +418,7 @@ def evaluate_procedures(
     caption_file: Optional[str],
     mapping_file_path: Optional[str],
     output_dir: str,
-    openai_client: OpenAIVisionClient,
+    openai_client: BaseLLMClient,
     proc_manual: str,
     proc_auto: str
 ) -> Optional[Dict[str, Any]]:

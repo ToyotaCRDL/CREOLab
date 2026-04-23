@@ -13,7 +13,7 @@ This repository provides a dataset of experimental procedure videos with ground 
 
 **Video dataset and ground truth procedures are available via DOI:**
 
-`https://doi.org/10.5281/zenodo.17811722`
+`https://doi.org/10.5281/zenodo.19702197`
 
 ### Dataset Contents
 
@@ -45,10 +45,19 @@ data/
 
 ## Example Code for Reproducing Paper Experiments
 
-This repository also includes reference implementation code to reproduce the evaluation experiments from the paper. The code demonstrates automatic procedure generation using GPT-5 API with two approaches:
+This repository also includes reference implementation code to reproduce the evaluation experiments from the paper. The code demonstrates automatic procedure generation using LLM APIs with two approaches:
 
 1. **Manual Object Detection**: Uses predefined objects’ coordinates and labels from caption files
-2. **Auto Object Detection**: Uses GPT-5 for automatic object detection
+2. **Auto Object Detection**: Uses LLM vision capabilities for automatic object detection
+
+**Supported LLM providers** (selectable via `--provider` argument or `config/api_config.json`):
+
+| Provider | `--provider` value | Library |
+|---|---|---|
+| OpenAI | `openai` (default) | `openai` |
+| Google Gemini | `gemini` | `google-genai` (Vertex AI) |
+| Llama on Vertex AI | `llama` | `openai` + `google-auth` (OpenAI-compatible endpoint) |
+| Anthropic Claude | `claude_haiku` | `anthropic` |
 
 ### Installation
 
@@ -60,13 +69,25 @@ pip install -r requirements.txt
 
 ### Setup
 
-1. Create a `.env` file:
+1. Create a `.env` file with the API key(s) for your chosen provider:
    ```
+   # For OpenAI
    OPENAI_API_KEY=your_openai_api_key
+   
+   # For Google Gemini (Vertex AI)
+   GOOGLE_GENAI_USE_VERTEXAI=True
+   GOOGLE_CLOUD_PROJECT=your_project_id
+   GOOGLE_CLOUD_LOCATION=us-central1
+   
+   # For Llama on Vertex AI
+   GOOGLE_CLOUD_PROJECT=your_project_id
+   
+   # For Anthropic Claude
+   ANTHROPIC_API_KEY=your_anthropic_api_key
    ```
 
 2. Download and place the dataset:
-   - Download the video dataset from DOI: `https://doi.org/[TO_BE_ANNOUNCED]`
+   - Download the video dataset from DOI: `https://doi.org/10.5281/zenodo.19702197`
    - Extract and place files in the `data/` directory:
    ```
    data/
@@ -95,10 +116,34 @@ pip install -r requirements.txt
 # Single file evaluation (reproduces single-video experiment)
 python example/procedure_evaluation_pipeline.py --caption-file data/captions/scenario05_decoy0.json
 
+# Use a specific provider (default: openai, configured in config/api_config.json)
+python example/procedure_evaluation_pipeline.py --provider gemini --caption-file data/captions/scenario05_decoy0.json
+
 # Batch processing (reproduces paper evaluation)
 python example/procedure_evaluation_pipeline.py --batch debug          # 2 takes, quick test
 python example/procedure_evaluation_pipeline.py --batch dev            # 15 takes, prompt development
 python example/procedure_evaluation_pipeline.py --batch test           # 50 takes, full evaluation
+
+# Batch processing with a specific provider
+python example/procedure_evaluation_pipeline.py --provider gemini --batch test
+
+# Use Anthropic Claude
+python example/procedure_evaluation_pipeline.py --provider claude_haiku --caption-file data/captions/scenario05_decoy0.json
+python example/procedure_evaluation_pipeline.py --provider claude_haiku --batch test
+```
+
+### Analysis Scripts
+
+Post-processing scripts for statistical analysis of batch results:
+
+- `example/nlp_metrics_dummy_progression.py` -- NLP metrics and regression analysis across decoy levels
+- `example/per_scenario_analysis.py` -- Per-scenario regression, Cohen's d, and summary statistics
+
+Both scripts auto-detect the latest batch directory. Run from the repository root:
+
+```bash
+python example/nlp_metrics_dummy_progression.py
+python example/per_scenario_analysis.py
 ```
 
 ### Evaluation System
@@ -129,16 +174,16 @@ python example/procedure_evaluation_pipeline.py --batch test           # 50 take
 
 Complete execution logs and generated results for the **test split** (50 takes, 10 iterations) are available at:
 
-`https://doi.org/10.5281/zenodo.17811722`
+`https://doi.org/10.5281/zenodo.19702197`
 
 The logs include:
 - Complete console output from `--batch test --iterations 10` execution
 - Generated procedures for all 50 takes (manual and auto object detection)
 - Evaluation results with detailed scoring breakdowns
-- Visualization charts and cross-analysis statistics
+- Cross-analysis statistics and summary CSVs
 - Batch summary and aggregate results
 
-**Total processing**: ~5000 minutes (~80 hours) with extensive GPT-5 API calls.
+**Total processing**: ~5000 minutes (~80 hours) with extensive LLM API calls.
 
 *This allows researchers to review complete experimental results without re-running the entire pipeline, thereby saving computational resources and time; however, the log data must not be used for secondary purposes or for any use beyond result inspection.*
 
@@ -146,37 +191,40 @@ The logs include:
 
 ```
 output/
-└── batch_YYYYMMDD_HHMMSS/
-    ├── test/ (or dev/ or debug/)
-    │   └── scenario05_decoy0/
-    │       ├── iter_01/
-    │       │   ├── integrations/
-    │       │   │   ├── manual_object_detection_integrated_procedure.txt
-    │       │   │   └── auto_object_detection_integrated_procedure.txt
-    │       │   ├── evaluation/
-    │       │   │   ├── rubric_evaluation_results.json
-    │       │   │   ├── evaluation_bar_chart.json
-    │       │   │   ├── evaluation_bar_chart.png
-    │       │   │   └── evaluation_summary.txt
-    │       │   ├── prompts/
-    │       │   │   ├── auto_detection/
-    │       │   │   ├── manual_detection/
-    │       │   │   ├── integration_auto_object_detection_prompt.txt
-    │       │   │   ├── integration_auto_object_detection_response.txt
-    │       │   │   ├── integration_manual_object_detection_prompt.txt
-    │       │   │   └── integration_manual_object_detection_response.txt
-    │       │   ├── frames/
-    │       │   ├── reference_images/
-    │       │   └── segments/
-    │       └── aggregate/
-    │           ├── aggregate_results.json
-    │           ├── aggregate_summary.txt
-    │           ├── take_aggregate_rubric_deduction_breakdown.json
-    │           └── take_aggregate_rubric_deduction_breakdown.png
-    └── cross_analysis/
-        ├── by_scenario_number/
-        ├── by_decoy_number/
-        └── overall_comparison/
+└── <provider>/
+    └── batch_YYYYMMDD_HHMMSS/
+        ├── test/ (or dev/ or debug/)
+        │   └── scenario05_decoy0/
+        │       ├── iter_01/
+        │       │   ├── integrations/
+        │       │   │   ├── manual_object_detection_integrated_procedure.txt
+        │       │   │   └── auto_object_detection_integrated_procedure.txt
+        │       │   ├── evaluation/
+        │       │   │   ├── rubric_evaluation_results.json
+        │       │   │   ├── evaluation_bar_chart.json
+        │       │   │   ├── evaluation_bar_chart.png
+        │       │   │   └── evaluation_summary.txt
+        │       │   ├── prompts/
+        │       │   │   ├── auto_detection/
+        │       │   │   ├── manual_detection/
+        │       │   │   ├── integration_auto_object_detection_prompt.txt
+        │       │   │   ├── integration_auto_object_detection_response.txt
+        │       │   │   ├── integration_manual_object_detection_prompt.txt
+        │       │   │   └── integration_manual_object_detection_response.txt
+        │       │   ├── frames/
+        │       │   ├── reference_images/
+        │       │   └── segments/
+        │       └── aggregate/
+        │           ├── aggregate_results.json
+        │           ├── aggregate_summary.txt
+        │           ├── take_aggregate_rubric_deduction_breakdown.json
+        │           └── take_aggregate_rubric_deduction_breakdown.png
+        └── cross_analysis/
+            ├── by_scenario_number/
+            ├── by_method_decoy_progression/
+            ├── overall_comparison/
+            ├── per_scenario_analysis/
+            └── by_method_decoy_progression_nlp_metrics/
 ```
 
 ## Citation
@@ -188,8 +236,8 @@ If you use this dataset or code in your research, please cite:
   title        = {CREOLab: CREative tool use in Object-rich Laboratory},
   author       = {Goto, Shigeaki and Hasebe, Tatsuki},
   year         = {2025},
-  doi          = {10.5281/zenodo.17811722},
-  url          = {https://doi.org/10.5281/zenodo.17811722}
+  doi          = {10.5281/zenodo.19702197},
+  url          = {https://doi.org/10.5281/zenodo.19702197}
 }
 ```
 

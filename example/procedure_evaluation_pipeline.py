@@ -20,7 +20,8 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from src.captioning.object_knowledge_loader import ObjectKnowledgeLoader
-from src.core.openai_client import OpenAIVisionClient
+from src.core import create_llm_client
+from src.utils.config_loader import config_loader
 from src.utils.experiment_logger import ExperimentLogger
 from src.core.base_models import CaptionData
 
@@ -151,8 +152,8 @@ def run_basic_pipeline(video_path: str, caption_file: str = None, output_base_di
     # Get video name for IDs
     video_name = Path(video_path).stem
     
-    # Initialize OpenAI client and knowledge loader
-    openai_client = OpenAIVisionClient()
+    # Initialize LLM client and knowledge loader
+    openai_client = create_llm_client()
     knowledge_loader = ObjectKnowledgeLoader()
     
     # ============================================================================
@@ -259,22 +260,28 @@ def run_basic_pipeline(video_path: str, caption_file: str = None, output_base_di
 def find_latest_batch_directory(output_base_dir: str, split_name: str) -> str:
     """
     Find the latest batch experiment directory for the given split.
+    Searches within the active provider's subdirectory.
     
     Args:
         output_base_dir: Base output directory (e.g., "output")
         split_name: Dataset split name ('dev', 'test', etc.)
     
     Returns:
-        Path to the latest split directory (e.g., "output/batch_XXXXX/debug"), or None if not found
+        Path to the latest split directory (e.g., "output/openai/batch_XXXXX/debug"), or None if not found
     """
     if not os.path.exists(output_base_dir):
         return None
     
+    provider = config_loader.get_provider()
+    provider_dir = os.path.join(output_base_dir, provider)
+    
+    if not os.path.exists(provider_dir):
+        return None
+    
     batch_dirs = []
-    for item in os.listdir(output_base_dir):
-        if item.startswith("batch_") and os.path.isdir(os.path.join(output_base_dir, item)):
-            # Check if this batch directory contains the split subdirectory
-            batch_path = os.path.join(output_base_dir, item)
+    for item in os.listdir(provider_dir):
+        if item.startswith("batch_") and os.path.isdir(os.path.join(provider_dir, item)):
+            batch_path = os.path.join(provider_dir, item)
             split_path = os.path.join(batch_path, split_name)
             if os.path.exists(split_path) and os.path.isdir(split_path):
                 batch_dirs.append((item, split_path))
@@ -344,11 +351,12 @@ def run_batch_processing(split_name: str, num_iterations: int = 5, max_duration:
         batch_experiment_dir = find_latest_batch_directory("output", split_name)
         if not batch_experiment_dir:
             print(f"Error: No existing batch experiment directory found for split '{split_name}'")
-            print("Available directories:")
-            output_dir = "output"
-            if os.path.exists(output_dir):
-                for item in sorted(os.listdir(output_dir)):
-                    if item.startswith("batch_") and os.path.isdir(os.path.join(output_dir, item)):
+            provider = config_loader.get_provider()
+            provider_dir = os.path.join("output", provider)
+            print(f"Available directories under output/{provider}/:")
+            if os.path.exists(provider_dir):
+                for item in sorted(os.listdir(provider_dir)):
+                    if item.startswith("batch_") and os.path.isdir(os.path.join(provider_dir, item)):
                         print(f"  {item}")
             return
         print(f"Resuming batch experiment: {batch_experiment_dir}")
@@ -637,7 +645,8 @@ def run_full_evaluation(video_path: str, caption_file: str, max_duration: float 
         summary_content = (
             f"Total iterations: {len(all_evaluation_results)}\n"
             f"Total evaluations: {len(all_evaluation_results)}\n"
-            f"Seed functionality: Disabled for GPT-5 compatibility\n\n"
+            f"Provider: {config_loader.get_provider()}\n"
+            f"Model: {config_loader.get_model()}\n\n"
         )
             
         for result in all_evaluation_results:
@@ -687,6 +696,9 @@ Batch splits:
     # Main operation modes
     parser.add_argument('--batch', choices=['debug', 'dev', 'test'],
                        help='Run batch processing on specified dataset split')
+    parser.add_argument('--provider', type=str,
+                       choices=['openai', 'gemini', 'gemini3flash', 'llama', 'claude_sonnet', 'claude_opus', 'claude_opus_thinking', 'claude_haiku'],
+                       help='LLM provider to use (overrides config default)')
     
     # File and processing options
     parser.add_argument('--caption-file', type=str,
@@ -702,6 +714,11 @@ Batch splits:
                        help='Resume from the latest batch experiment directory')
     
     args = parser.parse_args()
+    
+    # Set provider if specified
+    if args.provider:
+        config_loader.set_provider(args.provider)
+        print(f"Using provider: {args.provider}")
     
     # Handle batch processing mode
     if args.batch:

@@ -8,28 +8,28 @@ import time
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
 
-from src.core.openai_client import OpenAIVisionClient
+from src.core.base_client import BaseLLMClient
 from src.utils.config_loader import config_loader
 
 
 class ProcedureEvaluator:
     """
-    Evaluates integrated procedures using rubric-based absolute scoring with GPT-5.
+    Evaluates integrated procedures using rubric-based absolute scoring.
     Compares Manual Object Detection and Auto Object Detection methods using 100-point rubric system.
     
     This evaluator uses rubric-based scoring to provide absolute quality scores
     for experimental procedure reproducibility assessment with retry functionality.
     """
     
-    def __init__(self, openai_client: OpenAIVisionClient, max_retries: int = 3):
+    def __init__(self, llm_client: BaseLLMClient, max_retries: int = 3):
         """
         Initialize procedure evaluator.
         
         Args:
-            openai_client: OpenAI client for evaluation
+            llm_client: LLM client for evaluation
             max_retries: Maximum number of retry attempts for failed evaluations
         """
-        self.client = openai_client
+        self.client = llm_client
         self.max_retries = max_retries
         
         # Load evaluation configuration (uses api config)
@@ -108,7 +108,6 @@ class ProcedureEvaluator:
                 
                 # JSON format is already specified in the rubric prompt
                 
-                # Get evaluation from GPT-5
                 response = self.client.analyze_text_only(
                     prompt=formatted_prompt
                 )

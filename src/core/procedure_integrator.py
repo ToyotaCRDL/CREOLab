@@ -7,7 +7,7 @@ import os
 import json
 from typing import List, Dict, Any, Tuple
 from .base_models import SegmentProcedure, ProcedureStep, create_step_id
-from .openai_client import OpenAIVisionClient
+from .base_client import BaseLLMClient
 
 from src.utils.config_loader import config_loader
 from src.utils.prompt_loader import prompt_loader
@@ -24,9 +24,9 @@ class ProcedureIntegrator:
     Both methods use the common_integration prompt for consistency.
     """
     
-    def __init__(self, openai_client: OpenAIVisionClient, max_retries: int = 3):
+    def __init__(self, llm_client: BaseLLMClient, max_retries: int = 3):
         """Initialize the procedure integrator."""
-        self.client = openai_client
+        self.client = llm_client
         self.max_retries = max_retries
     
     def _is_valid_integration_result(self, result: str) -> Tuple[bool, str]:
@@ -89,8 +89,8 @@ class ProcedureIntegrator:
             attempt: Attempt number
             error: Error message
             output_dir: Output directory for logs
-            raw_response: Raw GPT response (if any)
-            prompt_used: Prompt that was sent to GPT
+            raw_response: Raw LLM response (if any)
+            prompt_used: Prompt that was sent to LLM
             validation_details: Details about why validation failed
         """
         if not output_dir:
@@ -144,7 +144,7 @@ class ProcedureIntegrator:
             output_dir: Output directory for warning logs
             
         Returns:
-            Tuple of (integrated_procedure_text, prompt_used, gpt_response)
+            Tuple of (integrated_procedure_text, prompt_used, llm_response)
         """
         if not procedures:
             return "No procedures to integrate.", "", ""
@@ -168,31 +168,30 @@ class ProcedureIntegrator:
         
         for attempt in range(1, self.max_retries + 1):
             try:
-                print(f"  Calling GPT-5 API for integration (attempt {attempt}/{self.max_retries})...")
+                print(f"  Calling LLM API for integration (attempt {attempt}/{self.max_retries})...")
                 
-                # Use analyze_text_only method for text-only integration
-                gpt_response = self.client.analyze_text_only(prompt=prompt)
-                print(f"  Received response from GPT-5 for integration")
-                print(f"  DEBUG: Response length: {len(gpt_response) if gpt_response else 0}")
-                print(f"  DEBUG: Response is None: {gpt_response is None}")
-                print(f"  DEBUG: Response is empty string: {gpt_response == '' if gpt_response is not None else 'N/A'}")
-                print(f"  DEBUG: Response preview: {gpt_response[:100] if gpt_response else 'None'}...")
+                llm_response = self.client.analyze_text_only(prompt=prompt)
+                print(f"  Received response from LLM for integration")
+                print(f"  DEBUG: Response length: {len(llm_response) if llm_response else 0}")
+                print(f"  DEBUG: Response is None: {llm_response is None}")
+                print(f"  DEBUG: Response is empty string: {llm_response == '' if llm_response is not None else 'N/A'}")
+                print(f"  DEBUG: Response preview: {llm_response[:100] if llm_response else 'None'}...")
                 
                 # Validate the response
-                is_valid, validation_details = self._is_valid_integration_result(gpt_response)
+                is_valid, validation_details = self._is_valid_integration_result(llm_response)
                 print(f"  DEBUG: Validation result: {is_valid}, Details: {validation_details}")
                 
                 if is_valid:
                     print(f"  Integration successful on attempt {attempt}")
-                    return gpt_response, prompt, gpt_response
+                    return llm_response, prompt, llm_response
                 else:
                     error_msg = f"Invalid integration result (attempt {attempt}): {validation_details}"
                     print(f"  Warning: {error_msg}")
                     self._save_warning_log("integration", attempt, error_msg, output_dir, 
-                                         raw_response=gpt_response, prompt_used=prompt, 
+                                         raw_response=llm_response, prompt_used=prompt, 
                                          validation_details=validation_details)
                     last_error = error_msg
-                    last_response = gpt_response
+                    last_response = llm_response
                     
                     if attempt < self.max_retries:
                         print(f"  Retrying integration...")

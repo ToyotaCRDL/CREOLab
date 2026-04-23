@@ -108,18 +108,16 @@ class FrameExtractor:
         Extract context frames for enhanced object detection.
         
         Frame extraction logic:
-        - Context frames: int(total_frames * n/7) for n=1,2,...,7
+        - Context frames: int(total_frames * n/num_frames) for n=1,2,...,num_frames
         - Note: Reference image (0 seconds) is handled separately and not included
-        
-        Total output: 7 context frames
         
         Args:
             video_path: Path to input video file
             output_dir: Directory to save extracted frames
-            num_frames: Parameter name kept for compatibility (always extracts 7 context frames)
+            num_frames: Number of context frames to extract (default: 7)
             
         Returns:
-            List of paths to extracted context frame files (7 frames)
+            List of paths to extracted context frame files
         """
         # Create output directory
         Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -141,18 +139,15 @@ class FrameExtractor:
         
         output_files = []
         
-        # Calculate context frame numbers: int(X * n/7) (n=1,2,...,7)
         # Note: 0-second frame exists separately as reference image, so not included in context
         frame_numbers = []
         
-        # Calculate context frame numbers: int(total_frames * n/7) for n=1,2,...,7
-        print(f"  Calculating context frames using formula: int({total_frames} * n/7)")
-        for n in range(1, 8):  # Extract 7 context frames (n=1,2,...,7)
-            frame_number = int(total_frames * n / 7)
-            # Ensure frame number is within valid range (0 to total_frames-1)
+        print(f"  Calculating context frames using formula: int({total_frames} * n/{num_frames})")
+        for n in range(1, num_frames + 1):
+            frame_number = int(total_frames * n / num_frames)
             if frame_number >= total_frames:
                 frame_number = total_frames - 1
-            print(f"    n={n}: int({total_frames} * {n}/7) = {frame_number}")
+            print(f"    n={n}: int({total_frames} * {n}/{num_frames}) = {frame_number}")
             frame_numbers.append(frame_number)
         
         print(f"  Final context frame numbers to extract: {frame_numbers}")

@@ -53,8 +53,8 @@ class SegmentProcedure:
     steps: List[ProcedureStep]
     objects: Optional[List[ObjectInfo]] = None
     processing_mode: str = "manual_detection"  # Processing mode used
-    used_prompt: Optional[str] = None  # The actual prompt sent to GPT
-    gpt_response: Optional[str] = None  # The raw response from GPT
+    used_prompt: Optional[str] = None  # The actual prompt sent to the LLM
+    llm_response: Optional[str] = None  # The raw response from the LLM
 
 
 

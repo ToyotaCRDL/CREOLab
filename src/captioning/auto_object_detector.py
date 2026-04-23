@@ -13,8 +13,9 @@ import logging
 from typing import List, Dict, Optional, Tuple
 import tempfile
 
-from src.core.openai_client import OpenAIVisionClient
+from src.core.base_client import BaseLLMClient
 from src.core.base_models import ExtractedFrame, ProcedureStep, SegmentProcedure, ObjectInfo, CaptionData, create_step_id
+from src.utils.config_loader import config_loader
 from src.utils.prompt_loader import prompt_loader
 
 
@@ -25,15 +26,15 @@ class AutoObjectDetector:
     Focused on detection, reference image creation, position adjustment, and mapping creation.
     """
     
-    def __init__(self, openai_client: OpenAIVisionClient, logger: logging.Logger = None):
+    def __init__(self, llm_client: BaseLLMClient, logger: logging.Logger = None):
         """
         Initialize auto object detector.
         
         Args:
-            openai_client: OpenAI Vision API client
+            llm_client: LLM client for vision API calls
             logger: Logger instance (defaults to module logger if not provided)
         """
-        self.client = openai_client
+        self.client = llm_client
         self.prompt_loader = prompt_loader
         self.logger = logger or logging.getLogger(__name__)
         # Only multi-frame detection is used
@@ -119,21 +120,28 @@ class AutoObjectDetector:
         
         self.logger.info(f"  Extracted reference frame: {reference_image_path}")
         
-        # Extract 7 evenly distributed context frames
+        max_images = config_loader.get_max_images()
+        num_context_frames = (max_images - 1) if max_images else 7
+
         context_frames = extractor.extract_context_frames_from_video(
-            original_video_path, context_frames_dir, num_frames=7
+            original_video_path, context_frames_dir, num_frames=num_context_frames
         )
         
         self.logger.info(f"  Extracted {len(context_frames)} context frames for enhanced detection")
         
-        # Prepare multi-frame prompt
+        # Prepare multi-frame prompt with dynamic frame count placeholders
         multi_frame_prompt = self.prompt_loader.get_prompt("common_captioning_prompts.json", "multi_frame_detection")
+        multi_frame_prompt = multi_frame_prompt.replace(
+            "{last_context_image_num}", str(num_context_frames + 1)
+        ).replace(
+            "{num_context_frames}", str(num_context_frames)
+        )
         
         # Prepare image list: reference image first, then context frames
         image_paths = [reference_image_path] + context_frames
         
         # Use multi-frame analysis
-        response = self.client.analyze_multiple_frames(
+        response = self.client.analyze_frames(
             frame_paths=image_paths,
             prompt=multi_frame_prompt
         )
@@ -169,7 +177,7 @@ class AutoObjectDetector:
     
     def adjust_object_coordinates(self, overlay_image_path: str, objects: List[ObjectInfo], video_id: str = None) -> List[ObjectInfo]:
         """
-        Adjust object coordinates using GPT-5 by analyzing the overlay image.
+        Adjust object coordinates using LLM by analyzing the overlay image.
         
         Args:
             overlay_image_path: Path to the overlay image with numbered objects
@@ -198,7 +206,7 @@ class AutoObjectDetector:
             current_objects=current_objects_text.strip()
         )
         
-        # Use GPT-5 to adjust coordinates
+        # Use LLM to adjust coordinates
         response = self.client.analyze_single_frame(
             frame_path=overlay_image_path,
             prompt=adjustment_prompt
@@ -450,7 +458,7 @@ class AutoObjectDetector:
                                    manual_overlay_path: str, manual_legend_json_path: str, 
                                    output_dir: str, video_id: str, auto_overlay_path: str = None) -> str:
         """
-        Generate object name mapping between auto-detected and manual objects using GPT.
+        Generate object name mapping between auto-detected and manual objects using LLM.
         
         Args:
             auto_detected_objects: List of automatically detected objects
@@ -489,7 +497,7 @@ class AutoObjectDetector:
             manual_objects_text=manual_objects_text
         )
         
-        # Call GPT to generate mapping
+        # Call LLM to generate mapping
         self.logger.info(f"  Generating object name mapping: {len(auto_detected_objects)} auto → {len(manual_objects)} manual objects")
         
         # Prepare image paths for analysis
@@ -503,10 +511,10 @@ class AutoObjectDetector:
         )
         
         if not response or not response.strip():
-            raise RuntimeError("GPT API returned empty or whitespace-only response for object name mapping")
+            raise RuntimeError("LLM API returned empty or whitespace-only response for object name mapping")
         
         if len(response.strip()) < 10:
-            raise RuntimeError(f"GPT response too short to be valid JSON: '{response}'")
+            raise RuntimeError(f"LLM response too short to be valid JSON: '{response}'")
         
         # Validation function for mapping format
         def validate_mapping(mapping_data):
@@ -645,12 +653,12 @@ class AutoObjectDetector:
     
     def _parse_gpt_json_response(self, response: str, expected_type: str = 'dict', validate_fn=None) -> Optional[any]:
         """
-        Unified JSON extraction and parsing utility for GPT responses.
+        Unified JSON extraction and parsing utility for LLM responses.
         
         Performs: code block removal → JSON boundary detection → parsing → type validation → custom validation
         
         Args:
-            response: Raw GPT response
+            response: Raw LLM response
             expected_type: Expected JSON type ('dict' or 'list')
             validate_fn: Optional function(data) that raises RuntimeError if validation fails
             
@@ -661,10 +669,10 @@ class AutoObjectDetector:
             RuntimeError: If response is empty, JSON is invalid, or validation fails
         """
         if not response or not response.strip():
-            raise RuntimeError("Empty response received from GPT API")
+            raise RuntimeError("Empty response received from LLM API")
         
         # Step 1 & 2: Remove code blocks and common prefixes
-        response = self._preprocess_gpt_response(response)
+        response = self._preprocess_llm_response(response)
         
         # Step 3: JSON boundary detection
         start_char, end_char = ('{', '}') if expected_type == 'dict' else ('[', ']')
@@ -692,7 +700,7 @@ class AutoObjectDetector:
         
         # Check for empty data
         if not data:
-            raise RuntimeError(f"Empty {expected_type} received from GPT")
+            raise RuntimeError(f"Empty {expected_type} received from LLM")
         
         # Step 6: Custom validation
         if validate_fn:
@@ -700,12 +708,12 @@ class AutoObjectDetector:
         
         return data
     
-    def _preprocess_gpt_response(self, response: str) -> str:
+    def _preprocess_llm_response(self, response: str) -> str:
         """
-        Preprocess GPT response to handle common formatting issues.
+        Preprocess LLM response to handle common formatting issues.
         
         Args:
-            response: Raw GPT response
+            response: Raw LLM response
             
         Returns:
             Cleaned response with common formatting issues resolved
@@ -724,7 +732,7 @@ class AutoObjectDetector:
         if response.startswith('json\n'):
             response = response[5:]
         
-        # Remove common prefixes that GPT might add
+        # Remove common prefixes that LLMs might add
         prefixes_to_remove = [
             'Here is the JSON mapping:',
             'Here\'s the JSON mapping:',
