@@ -1,4 +1,21 @@
 {
-  "model": "gpt-5-2025-08-07",
-  "max_tokens": 16000
+  "default_provider": "openai",
+  "openai": {
+    "model": "gpt-5-2025-08-07",
+    "max_tokens": 16000
+  },
+  "gemini": {
+    "model": "gemini-3.1-pro-preview",
+    "max_tokens": 16000
+  },
+  "llama": {
+    "model": "meta/llama-4-maverick-17b-128e-instruct-maas",
+    "max_tokens": 8192,
+    "location": "us-east5",
+    "max_images": 5
+  },
+  "claude_haiku": {
+    "model": "claude-haiku-4-5-20251001",
+    "max_tokens": 16000
+  }
 }
