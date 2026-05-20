@@ -2,7 +2,7 @@
 
 **CRE**ative tool use in **O**bject-rich **Lab**oratory
 
-**Paper**: [CREOLab: A Procedure Captioning Dataset for Understanding Creative Tool Use in Object-Rich Laboratory Videos](https://doi.org/10.1039/D5DD00542F)
+**Paper**: [CREOLab: a procedure captioning dataset for understanding creative tool use in object-rich laboratory videos](https://doi.org/10.1039/D5DD00542F)
 
 ![CREOLab System Overview](images/CREOLab.jpg)
 
@@ -235,7 +235,7 @@ If you use this dataset or code in your research, please cite:
 ```bibtex
 @article{Goto2026CREOLab,
   author  = {Goto, Shigeaki and Hasebe, Tatsuki},
-  title   = {CREOLab: A Procedure Captioning Dataset for Understanding Creative Tool Use in Object-Rich Laboratory Videos},
+  title   = {CREOLab: a procedure captioning dataset for understanding creative tool use in object-rich laboratory videos},
   journal = {Digital Discovery},
   year    = {2026},
   doi     = {10.1039/D5DD00542F},
