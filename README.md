@@ -238,6 +238,8 @@ If you use this dataset or code in your research, please cite:
   title   = {CREOLab: a procedure captioning dataset for understanding creative tool use in object-rich laboratory videos},
   journal = {Digital Discovery},
   year    = {2026},
+  volume  = {5},
+  pages   = {2600--2612},
   doi     = {10.1039/D5DD00542F},
   url     = {https://doi.org/10.1039/D5DD00542F}
 }
