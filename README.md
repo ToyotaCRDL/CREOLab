@@ -14,7 +14,7 @@ This repository provides a dataset of experimental procedure videos with ground 
 
 **Video dataset and ground truth procedures are available via DOI:**
 
-`https://doi.org/10.5281/zenodo.19702197`
+<https://doi.org/10.5281/zenodo.19702197>
 
 ### Dataset Contents
 
@@ -175,7 +175,7 @@ python example/per_scenario_analysis.py
 
 Complete execution logs and generated results for the **test split** (50 takes, 10 iterations) are available at:
 
-`https://doi.org/10.5281/zenodo.19702197`
+<https://doi.org/10.5281/zenodo.19702197>
 
 The logs include:
 - Complete console output from `--batch test --iterations 10` execution
